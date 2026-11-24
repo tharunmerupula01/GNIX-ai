@@ -1,47 +1,65 @@
-FROM python:3.12-slim AS base
+# --------------------------------------------------------------
+# 1️⃣ Build stage – compile OpenCut (Rust) + install Python deps
+# --------------------------------------------------------------
+FROM python:3.12-slim AS build
 
-# ---- Install system deps ----
+# ---- System packages needed for Rust + Python builds ----
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    git \
-    ffmpeg \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+        build-essential \
+        curl \
+        git \
+        ffmpeg \
+        pkg-config \
+        libssl-dev \
+        && rm -rf /var/lib/apt/lists/*
 
-# ---- Install Rust toolchain ----
+# ---- Install Rust toolchain (stable) ----
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && \
-    . $HOME/.cargo/env && \
     rustup default stable && \
     rustup target add x86_64-unknown-linux-gnu
-ENV PATH="$HOME/.cargo/bin:$PATH"
 
-# ---- Build OpenCut binary ----
-WORKDIR /app
+# Persist Rust binaries for later layers
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# ---- Build the OpenCut binary ----
+WORKDIR /src
 COPY external/OpenCut-main ./external/OpenCut-main
-WORKDIR /app/external/OpenCut-main
+WORKDIR /src/external/OpenCut-main
 RUN cargo build --release
 
-# ---- Prepare Python environment ----
-WORKDIR /app
+# ---- Install Python requirements ----
+WORKDIR /src
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN python -m pip install --upgrade pip && \
     pip install -r backend/requirements.txt
 
-# ---- Copy application code ----
+# ---- Copy the Python source code ----
 COPY backend ./backend
 
-# ---- Expose port for FastAPI ----
-EXPOSE 8000
-
-# ---- Runtime image ----
+# --------------------------------------------------------------
+# 2️⃣ Runtime stage – tiny image that only contains what we need
+# --------------------------------------------------------------
 FROM python:3.12-slim AS runtime
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
+# ---- Runtime system dependency (only ffmpeg) ----
+RUN apt-get update && apt-get install -y ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+# ---- Create a non‑root user (safer) ----
+RUN useradd -m appuser
+USER appuser
 WORKDIR /app
-COPY --from=base /app/external/OpenCut-main/target/release/opencut ./opencut
-COPY --from=base /app/backend ./backend
-COPY --from=base /app/backend/requirements.txt ./backend/requirements.txt
+
+# ---- Bring in the compiled OpenCut binary and the Python app ----
+COPY --from=build /src/external/OpenCut-main/target/release/opencut ./opencut
+COPY --from=build /src/backend ./backend
+COPY --from=build /src/backend/requirements.txt ./backend/requirements.txt
+
+# ---- Install Python deps for the runtime layer ----
 RUN pip install --no-cache-dir -r backend/requirements.txt
-ENV PATH="/app:$PATH"
-CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "backend.main:app", "--bind", "0.0.0.0:8000"]
+
+# Ensure the binary is on the PATH
+ENV PATH="/app:${PATH}"
+
+# ---- Fly will set $PORT at runtime; bind to it ----
+CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "backend.main:app", "--bind", "0.0.0.0:${PORT}"]
