@@ -100,18 +100,35 @@ async def amma_first_love(
     prompt: Optional[str] = Form(None),
     message: Optional[str] = Form(None),
     text: Optional[str] = Form(None),
+    payload: Optional[str] = Form(None),
     audio_file: Optional[UploadFile] = File(None),
     session_id: Optional[str] = Form(None),
     preferred_lang: Optional[str] = Form(None),
 ):
-    """Endpoint that accepts a song and a free‑form prompt, parses the prompt,
-    runs the full pipeline and returns the generated video.
+    """Endpoint that accepts a song and a free‑form or structured prompt,
+    parses the prompt, runs the full pipeline and returns the generated video.
     """
-    user_prompt = prompt or message or text or "Generate video"
     sess_id = session_id or str(uuid.uuid4())
-    blueprint = {
-        "session_id": sess_id,
-    }
+    # If a structured JSON payload is provided, validate it with the VideoPrompt model.
+    # Otherwise fall back to the legacy free‑form prompt handling.
+    if payload:
+        import json
+        from .models.prompt_schema import VideoPrompt
+        try:
+            payload_dict = json.loads(payload)
+            video_prompt = VideoPrompt(**payload_dict)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Prompt validation error: {exc}")
+        # Use the validated data to build the blueprint.
+        user_prompt = video_prompt.prompt
+        blueprint = {"session_id": sess_id, "settings": video_prompt.settings.model_dump()}
+        if video_prompt.metadata:
+            blueprint["metadata"] = video_prompt.metadata.model_dump()
+    else:
+        # Legacy path – free‑form prompt parsing.
+        user_prompt = prompt or message or text or "Generate video"
+        blueprint = {"session_id": sess_id}
+
     if audio_file:
         path = _load_file_temp(audio_file)
         blueprint["audio_file"] = path.name

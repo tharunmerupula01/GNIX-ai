@@ -369,7 +369,16 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
                   : "w-64 aspect-[9/16]"
               }`}
             >
-              {/* Dynamic Aura Ring */}
+              {/* Generated Video Player when projectState.video is available */}
+              {projectState.video ? (
+                <video
+                  src={projectState.video}
+                  controls
+                  className="w-full h-full object-contain rounded-xl relative z-20"
+                />
+              ) : (
+                <>
+                  {/* Dynamic Aura Ring */}
               <div className="absolute inset-0 pointer-events-none opacity-30 flex items-center justify-center">
                 <div
                   className="rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/5 transition-transform duration-100 shadow-[0_0_40px_rgba(212,175,55,0.2)]"
@@ -453,6 +462,8 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
               <div className="absolute top-3 right-3 text-[10px] font-mono text-[#8E9992]/80 bg-black/60 px-2 py-0.5 rounded border border-white/5">
                 48kHz • 10ms LOCK
               </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -629,14 +640,20 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
             <p className="text-[10px] text-[#8E9992]">
               Rendered with FFmpeg & synchronized audio.
             </p>
-            <a
-              href={projectState.video || "/master_video.mp4"}
-              download="gnix_master_video.mp4"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded bg-[#D4AF37] text-black font-bold uppercase text-[11px] hover:bg-[#F5E084] transition-colors w-full justify-center shadow-[0_0_12px_rgba(212,175,55,0.3)]"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Download MP4 File
-            </a>
+            {projectState.video ? (
+              <a
+                href={projectState.video}
+                download="gnix_master_video.mp4"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded bg-[#D4AF37] text-black font-bold uppercase text-[11px] hover:bg-[#F5E084] transition-colors w-full justify-center shadow-[0_0_12px_rgba(212,175,55,0.3)]"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download MP4 File
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-2 px-3 py-2 rounded bg-[#141b16] text-[#8E9992] font-mono text-[11px] w-full justify-center border border-[#1e2621]">
+                No video generated yet
+              </span>
+            )}
           </div>
         </div>
       </div>

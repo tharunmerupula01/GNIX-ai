@@ -35,6 +35,9 @@ COPY external/OpenCut-main/opencut_cli_wrapper.py ./external/OpenCut-main/opencu
 # Copy built Next.js frontend
 COPY --from=frontend-builder /app/frontend /app/frontend
 
+# Ensure export mount directory exists for Fly volume persistence
+RUN mkdir -p /app/frontend/public/exports
+
 # Expose Next.js frontend port (proxies /api/* to FastAPI on 127.0.0.1:8000)
 EXPOSE 3000
 

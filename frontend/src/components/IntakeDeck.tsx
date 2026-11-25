@@ -142,6 +142,7 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
   };
 
   const executePipelineRequest = async () => {
+    // Legacy pipeline for generic chat – unchanged
     if (!prompt.trim() && !file) {
       alert("Please provide an audio file or instructions for Gnix.");
       return;
@@ -198,63 +199,84 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
         onSessionCreated(sessionId);
       }
     } catch (err: any) {
-      setTerminalLogs((prev) => [
-        ...prev,
-        `[ERROR] Execution halted: ${err.message || "Failed to reach backend"}. Please verify backend is listening on port 8000.`,
-      ]);
-      setPipelineStep(0);
+      console.error(err);
+      alert(`Error: ${err.message}`);
     } finally {
       setPipelineLoading(false);
+      setPipelineStep(0);
     }
   };
 
-  // New helper to generate video
+  // New function: generate video using structured prompt schema
   const generateVideo = async () => {
-    if (!prompt.trim() && !file) {
-      alert('Please provide an audio file or prompt.');
+    if (!file) {
+      alert("Please upload an audio file before generating a video.");
       return;
     }
-    // Use video-specific loading state
-    setVideoLoading(true);
+    // Build structured payload according to VideoPrompt schema
+    const payload = {
+      prompt: prompt.trim() || "Generate video",
+      settings: {
+        background: { type: backgroundType, value: backgroundValue },
+        font: { family: fontFamily, size: Number(fontSize), color: fontColor, style: fontStyle },
+        lyricsStyle: { animation: lyricsAnimation, syncWithAudio: true, position: lyricsPosition },
+        effects: { type: selectedEffects },
+      },
+      metadata: { title: videoTitle, description: videoDescription, tags: videoTags?.split(',').map(t => t.trim()) },
+    };
     const formData = new FormData();
     const sessionId = activeSessionId || `gnix-${Date.now().toString().slice(-6)}`;
-    formData.append('session_id', sessionId);
-    formData.append('message', prompt || 'Generate video');
-    formData.append('mode', 'generate_video');
-    formData.append('preferred_lang', preferredLang);
-    if (file) formData.append('audio_file', file);
+    formData.append("session_id", sessionId);
+    formData.append("payload", JSON.stringify(payload));
+    formData.append("audio_file", file);
+    setVideoLoading(true);
     try {
-      // First try the relative endpoint (frontend proxy), then fallback to backend host
       let res: Response;
       try {
-        res = await fetch('/api/amma-is-my-first-love', { method: 'POST', body: formData });
+        res = await fetch("/api/amma-is-my-first-love", { method: "POST", body: formData });
       } catch (_) {
-        res = await fetch('http://127.0.0.1:8000/api/amma-is-my-first-love', { method: 'POST', body: formData });
+        res = await fetch("http://127.0.0.1:8000/api/amma-is-my-first-love", { method: "POST", body: formData });
       }
-      if (!res.ok) throw new Error(`Server ${res.status}`);
+      if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
       const data = await res.json();
       const resolvedVideoUrl = data.video_url || (data.video_path ? `/api/exports/${data.video_path}` : null);
       if (resolvedVideoUrl) {
         setVideoUrl(resolvedVideoUrl);
+        // Populate project state for OpenCut Studio
         setProjectState({
-          status: "completed",
+          audio_slice: file.name,
+          video: resolvedVideoUrl,
           transcription: data.transcription || "Video generated successfully.",
           alignment: data.alignment || [],
-          video: resolvedVideoUrl,
+          status: data.status || "completed",
         });
         if (onSessionCreated && !activeSessionId) {
           onSessionCreated(sessionId);
         }
       } else {
-        alert('Video not returned from server');
+        alert("Video not returned from server");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert('Video generation failed');
+      alert(`Video generation failed: ${e.message}`);
     } finally {
       setVideoLoading(false);
     }
   };
+
+  // UI state for structured prompt fields (simple defaults)
+  const [backgroundType, setBackgroundType] = useState<'image'|'color'|'gradient'|'video'>('gradient');
+  const [backgroundValue, setBackgroundValue] = useState('#0f0c29, #302b63'); // CSS gradient string
+  const [fontFamily, setFontFamily] = useState('Montserrat');
+  const [fontSize, setFontSize] = useState('48');
+  const [fontColor, setFontColor] = useState('#00ff99');
+  const [fontStyle, setFontStyle] = useState<'solid'|'neon'|'glow'|'outline'>('neon');
+  const [lyricsAnimation, setLyricsAnimation] = useState<'kinetic'|'bounce'|'fade'|'typewriter'>('kinetic');
+  const [lyricsPosition, setLyricsPosition] = useState<'center'|'bottom'|'top'>('center');
+  const [selectedEffects, setSelectedEffects] = useState<Array<'strobe'|'particle'|'glitch'|'bloom'>>(['bloom']);
+  const [videoTitle, setVideoTitle] = useState('');
+  const [videoDescription, setVideoDescription] = useState('');
+  const [videoTags, setVideoTags] = useState('');
 
   const formatSecs = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -295,6 +317,78 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
           </span>
         </div>
         {/* Dropzone container */}
+        {/* Structured Prompt Controls */}
+        <section className="mt-6 p-4 rounded-xl bg-[#0c0f0d] border border-[#1e2621]">
+          <h3 className="text-sm font-medium text-[#EAEFEC] mb-3" style={{ fontFamily: "var(--font-serif)" }}>Video Prompt Settings</h3>
+          {/* Background */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <label className="text-xs text-[#8E9992]">Background Type</label>
+            <select value={backgroundType} onChange={(e) => setBackgroundType(e.target.value as any)} className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded">
+              <option value="image">Image</option>
+              <option value="color">Color</option>
+              <option value="gradient">Gradient</option>
+              <option value="video">Video</option>
+            </select>
+            <label className="text-xs text-[#8E9992]">Background Value</label>
+            <input type="text" value={backgroundValue} onChange={(e) => setBackgroundValue(e.target.value)} placeholder="URL or CSS value" className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded" />
+          </div>
+          {/* Font */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <label className="text-xs text-[#8E9992]">Font Family</label>
+            <input type="text" value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} placeholder="Montserrat" className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded" />
+            <label className="text-xs text-[#8E9992]">Font Size (px)</label>
+            <input type="number" min={10} max={200} value={fontSize} onChange={(e) => setFontSize(e.target.value)} className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded" />
+            <label className="text-xs text-[#8E9992]">Font Color</label>
+            <input type="color" value={fontColor} onChange={(e) => setFontColor(e.target.value)} className="p-0.5 rounded" />
+            <label className="text-xs text-[#8E9992]">Font Style</label>
+            <select value={fontStyle} onChange={(e) => setFontStyle(e.target.value as any)} className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded">
+              <option value="solid">Solid</option>
+              <option value="neon">Neon</option>
+              <option value="glow">Glow</option>
+              <option value="outline">Outline</option>
+            </select>
+          </div>
+          {/* Lyrics */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <label className="text-xs text-[#8E9992]">Lyrics Animation</label>
+            <select value={lyricsAnimation} onChange={(e) => setLyricsAnimation(e.target.value as any)} className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded">
+              <option value="kinetic">Kinetic</option>
+              <option value="bounce">Bounce</option>
+              <option value="fade">Fade</option>
+              <option value="typewriter">Typewriter</option>
+            </select>
+            <label className="text-xs text-[#8E9992]">Lyrics Position</label>
+            <select value={lyricsPosition} onChange={(e) => setLyricsPosition(e.target.value as any)} className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded">
+              <option value="center">Center</option>
+              <option value="bottom">Bottom</option>
+              <option value="top">Top</option>
+            </select>
+          </div>
+          {/* Effects */}
+          <div className="mb-3">
+            <span className="text-xs text-[#8E9992]">Effects</span>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {(['strobe','particle','glitch','bloom'] as const).map((eff) => (
+                <label key={eff} className="flex items-center text-xs text-[#EAEFEC]">
+                  <input type="checkbox" checked={selectedEffects.includes(eff)} onChange={(e) => {
+                    if (e.target.checked) setSelectedEffects([...selectedEffects, eff]);
+                    else setSelectedEffects(selectedEffects.filter(v => v !== eff));
+                  }} className="mr-1" />
+                  {eff}
+                </label>
+              ))}
+            </div>
+          </div>
+          {/* Metadata */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <label className="text-xs text-[#8E9992]">Title</label>
+            <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded" />
+            <label className="text-xs text-[#8E9992]">Description</label>
+            <textarea value={videoDescription} onChange={(e) => setVideoDescription(e.target.value)} rows={2} className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded" />
+            <label className="text-xs text-[#8E9992]">Tags (comma separated)</label>
+            <input type="text" value={videoTags} onChange={(e) => setVideoTags(e.target.value)} placeholder="e.g. neon, kinetic, lyrics" className="bg-[#080a09] border border-[#1e2621] text-[#EAEFEC] p-1 rounded" />
+          </div>
+        </section>
         {!file ? (
           <div
             onDrop={handleDrop}
@@ -561,11 +655,22 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
             )}
           </button>
           <button
+            type="button"
             onClick={generateVideo}
             disabled={videoLoading}
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-[#D4AF37] hover:bg-[#F5E084] text-[#070908] text-xs font-medium uppercase transition-all disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-2.5 px-5 py-2.5 rounded-lg bg-[#D4AF37] hover:bg-[#F5E084] text-[#070908] text-xs font-semibold tracking-wider uppercase transition-all shadow-[0_0_16px_rgba(212,175,55,0.2)] disabled:opacity-50 cursor-pointer"
           >
-            {videoLoading ? 'Generating...' : 'Generate Video'}
+            {videoLoading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-[#070908]" />
+                <span>Generating Video...</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 text-[#070908]" />
+                <span>Generate Video</span>
+              </>
+            )}
           </button>
           {onLaunchStudio && (
             <button
@@ -574,7 +679,7 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
                 onLaunchStudio(
                   projectState || {
                     status: "completed",
-                    video: videoUrl || "/master_video.mp4",
+                    video: videoUrl || undefined,
                     alignment: [],
                   }
                 )

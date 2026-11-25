@@ -16,6 +16,10 @@ primary_region = 'sin'
   min_machines_running = 0
   processes = ['app']
 
+[[mounts]]
+  source = 'video_data'
+  destination = '/app/frontend/public/exports'
+
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
