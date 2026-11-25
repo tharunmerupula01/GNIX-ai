@@ -1,7 +1,22 @@
-app = "gnix-ai"
-primary_region = "ams"
+app = 'gnix-ai'
+primary_region = 'ams'
 
 [build]
+
+[services]
+  [[services.ports]]
+    port = 8000
+    handlers = ["http"]
+
+  [[services.tcp_checks]]
+    interval = 10000
+    timeout = 2000
+    restart_limit = 0
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
 
 [env]   # add any secrets here, e.g. MY_API_KEY = "value"
 
