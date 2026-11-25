@@ -209,18 +209,18 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
         text_chain = ("," + ",".join(filters)) if filters else ""
         filter_complex = (
             f"[0:v]format=yuv420p[bg];"
-            f"[1:a]showwaves=s=1280x200:mode=cline:colors={wave_color}[waves];"
+            f"[1:a]showwaves=s=1280x200:r=24:mode=cline:colors={wave_color}[waves];"
             f"[bg][waves]overlay=0:H-240{text_chain}[v]"
         )
         cmd = [
             ffmpeg, "-y",
-            "-f", "lavfi", "-i", f"color=c={bg_color}:s=1280x720:d=30",
+            "-f", "lavfi", "-i", f"color=c={bg_color}:s=1280x720:r=24:d=30",
             "-i", str(source_audio),
             "-filter_complex", filter_complex,
             "-map", "[v]", "-map", "1:a",
             "-shortest",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "128k",
             str(public_video)
         ]
         try:
@@ -230,18 +230,18 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
             print("FFmpeg drawtext fallback:", draw_err)
             fallback_complex = (
                 f"[0:v]format=yuv420p[bg];"
-                f"[1:a]showwaves=s=1280x200:mode=cline:colors={wave_color}[waves];"
+                f"[1:a]showwaves=s=1280x200:r=24:mode=cline:colors={wave_color}[waves];"
                 f"[bg][waves]overlay=0:H-240[v]"
             )
             subprocess.run([
                 ffmpeg, "-y",
-                "-f", "lavfi", "-i", f"color=c={bg_color}:s=1280x720:d=30",
+                "-f", "lavfi", "-i", f"color=c={bg_color}:s=1280x720:r=24:d=30",
                 "-i", str(source_audio),
                 "-filter_complex", fallback_complex,
                 "-map", "[v]", "-map", "1:a",
                 "-shortest",
-                "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                "-c:a", "aac",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "128k",
                 str(public_video)
             ], check=True)
         shutil.copyfile(str(public_video), str(video_path))
