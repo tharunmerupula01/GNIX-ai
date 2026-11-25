@@ -15,7 +15,6 @@ primary_region = 'ams'
   [[services.ports]]
     port = 80
     handlers = ["http"]
-
   [[services.tcp_checks]]
     interval = 10000
     timeout = 2000
