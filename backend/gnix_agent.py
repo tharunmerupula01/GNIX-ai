@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 from .intent_engine import parse_intent
-from .precision_aligner import transcribe_audio_window, align_lyrics_precisely
+from .precision_aligner import transcribe_audio_window, align_lyrics_precisely, _slice_audio, transcribe_segments
 
 # ---- Helper functions ----------------------------------------------------
 
@@ -118,21 +118,44 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
     # The previous implementation tried to guess the song based on filename/keywords,
     # which caused every upload to be treated as “Etu Pone”.
     # We now always start with an empty lyric pack and let the pipeline auto‑transcribe.
-    # If you need custom packs for specific songs, add a JSON lookup table here.
-    lyrics_multilang = {}
-    alignment = []
-    transcription = ""
-    # Mark that we want auto‑transcription of the audio.
-    blueprint["lyrics_mode"] = "auto_transcribe"
-    blueprint["lyrics_verified"] = False
-    # No special handling for Etu Pone – the UI will show the generic workflow.
-
-
     export_dir = Path(__file__).parent / "assets" / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     video_path = export_dir / f"video_{blueprint.get('session_id')}.mp4"
     public_video = Path(__file__).parents[1] / "frontend" / "public" / "master_video.mp4"
     source_audio = audio_path if audio_path and audio_path.is_file() else Path(__file__).parents[1] / "assets" / "audio" / "uploaded_media_1794718451418.mp3"
+
+    # Real lyric transcription / alignment so the rendered video has timed lyrics
+    lyrics_multilang = {}
+    alignment = []
+    transcription = ""
+    raw_lyrics = (blueprint.get("lyrics_text") or "").strip()
+    preferred = blueprint.get("preferred_lang", "english").lower()
+
+    try:
+        if raw_lyrics:
+            slice_wav = _slice_audio(str(source_audio), start, duration)
+            alignment = align_lyrics_precisely(str(slice_wav), raw_lyrics, duration)
+            transcription = raw_lyrics
+        else:
+            from .precision_aligner import transcribe_segments
+            alignment = transcribe_segments(str(source_audio), duration, start)
+            transcription = " ".join(item["text"] for item in alignment).strip()
+    except Exception as align_err:
+        print("Lyric transcription/alignment fallback:", align_err)
+
+    if alignment:
+        lang_bucket = "english" if preferred == "dual" else preferred
+        lyrics_multilang = {
+            lang_bucket: alignment,
+            "english": alignment,
+            "telugu": alignment,
+            "hindi": alignment,
+        }
+        blueprint["lyrics_mode"] = "aligned"
+        blueprint["lyrics_verified"] = True
+    else:
+        blueprint["lyrics_mode"] = "auto_transcribe"
+        blueprint["lyrics_verified"] = False
 
     # Generate real MP4 with FFmpeg (background, audio-reactive waveform, and text/subtitles)
     try:

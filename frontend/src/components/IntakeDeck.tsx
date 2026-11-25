@@ -23,6 +23,11 @@ interface ProjectState {
   audio_slice?: string;
   transcription?: string;
   alignment?: Array<{ text: string; start: number; end: number }>;
+  lyrics_multilang?: {
+    telugu?: Array<{ text: string; start: number; end: number }>;
+    english?: Array<{ text: string; start: number; end: number }>;
+    hindi?: Array<{ text: string; start: number; end: number }>;
+  };
   video?: string;
   status?: string;
 }
@@ -247,6 +252,7 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
           video: resolvedVideoUrl,
           transcription: data.transcription || "Video generated successfully.",
           alignment: data.alignment || [],
+          lyrics_multilang: data.lyrics_multilang,
           status: data.status || "completed",
         };
         // Populate project state and transition straight into OpenCut Studio

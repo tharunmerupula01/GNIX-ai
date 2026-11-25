@@ -152,6 +152,7 @@ async def amma_first_love(
         "video_url": f"/api/exports/{video_name}" if video_name else None,
         "transcription": proj_state.get("transcription"),
         "alignment": proj_state.get("alignment"),
+        "lyrics_multilang": proj_state.get("lyrics_multilang"),
         "status": "completed",
     })
 

@@ -84,6 +84,24 @@ def transcribe_audio_window(audio_path: str, clip_duration: float, start_time: f
         torch.cuda.empty_cache()
     return result
 
+
+def transcribe_segments(audio_path: str, clip_duration: float, start_time: float = 0.0) -> List[Dict]:
+    """Return timestamped lyric segments ``[{"text", "start", "end"}]`` for the audio slice."""
+    slice_path = _slice_audio(audio_path, start_time, clip_duration)
+    segments, _ = _MODEL.transcribe(str(slice_path), word_timestamps=True, vad_filter=True)
+    aligned: List[Dict] = []
+    for seg in segments:
+        txt = (seg.text or "").strip()
+        if txt:
+            aligned.append({
+                "text": txt,
+                "start": round(float(seg.start), 2),
+                "end": round(float(seg.end), 2),
+            })
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return aligned
+
 def align_lyrics_precisely(vocals_wav_path: str, raw_lyrics: str, clip_duration: float) -> List[Dict]:
     """Return a list of lyric line dictionaries aligned to 10 ms onsets.
     ``raw_lyrics`` is a multi‑line string (lines separated by ``\n``). The function

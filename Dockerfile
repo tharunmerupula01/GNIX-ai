@@ -9,10 +9,11 @@ RUN npm run build
 # Stage 2: Final runtime with Python backend + Node.js Next.js frontend
 FROM python:3.12-slim
 
-# Install system dependencies (ffmpeg + libsndfile1 for audio/video processing)
+# Install system dependencies (ffmpeg + libsndfile1 + fonts for drawtext)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Node.js runtime from node:20-slim
