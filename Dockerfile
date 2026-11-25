@@ -1,45 +1,24 @@
-# Multi‑stage Dockerfile for GNIX‑ai
-# -------------------------------------------------
-# Builder stage – compile the OpenCut Rust binary
-FROM rust:slim-bullseye AS rustbuilder
-WORKDIR /src
-# Copy only the OpenCut source
-COPY external/OpenCut-main ./external/OpenCut-main
-RUN cargo build --release
+# Dockerfile for GNIX-ai FastAPI backend
+FROM python:3.12-slim
 
-# Base stage – install system packages needed for the Python app
-FROM python:3.12-slim AS base
-# ---- Install system dependencies ----
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    git \
+# Install system dependencies (ffmpeg for audio/video processing)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    pkg-config \
-    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- Prepare Python environment ----
 WORKDIR /app
+
+# Install Python dependencies
 COPY backend/requirements.txt ./backend/requirements.txt
-RUN python -m pip install --upgrade pip && \
-    pip install -r backend/requirements.txt
+RUN python -m pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r backend/requirements.txt
 
-# ---- Copy application code and compiled binary ----
+# Copy backend code, assets, and OpenCut CLI wrapper
 COPY backend ./backend
-# Bring the Rust binary from the builder stage
-COPY --from=rustbuilder /src/external/OpenCut-main/target/release/opencut ./opencut
+COPY assets ./assets
+COPY external/OpenCut-main/opencut_cli_wrapper.py ./external/OpenCut-main/opencut_cli_wrapper.py
 
-# ---- Expose FastAPI port ----
+# Expose FastAPI port (matches fly.toml internal_port = 8000)
 EXPOSE 8000
 
-# Runtime stage – slim Python image with the compiled binary
-FROM python:3.12-slim AS runtime
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-# Copy everything from the base stage (Python deps, code, binary)
-COPY --from=base /app /app
-# Ensure the binary is on PATH
-ENV PATH="/app:$PATH"
-# Start the app with Gunicorn + Uvicorn workers
 CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "backend.main:app", "--bind", "0.0.0.0:8000"]
