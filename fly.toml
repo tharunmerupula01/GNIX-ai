@@ -1,0 +1,25 @@
+# Fly configuration for gnix‑ai (generated 2026‑11‑25)
+# See https://fly.io/docs/reference/configuration for details.
+
+app = 'gnix-ai'
+primary_region = 'ams'
+
+[build]
+
+[http_service]
+  internal_port = 8000            # FastAPI container port
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[env]   # add any secrets here, e.g. MY_API_KEY = "value"
+
+[deploy]
+  release_command = ""
