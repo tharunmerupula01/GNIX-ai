@@ -42,4 +42,4 @@ RUN mkdir -p /app/frontend/public/exports
 # Expose Next.js frontend port (proxies /api/* to FastAPI on 127.0.0.1:8000)
 EXPOSE 3000
 
-CMD ["sh", "-c", "gunicorn -w 1 -k uvicorn.workers.UvicornWorker backend.main:app --bind 127.0.0.1:8000 & cd /app/frontend && exec npm run start -- -p 3000 -H 0.0.0.0"]
+CMD ["sh", "-c", "gunicorn -w 1 -k uvicorn.workers.UvicornWorker backend.main:app --bind 127.0.0.1:8000 --timeout 300 & cd /app/frontend && exec npm run start -- -p 3000 -H 0.0.0.0"]

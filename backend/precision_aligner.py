@@ -50,9 +50,10 @@ import librosa
 import soundfile as sf
 from faster_whisper import WhisperModel
 
-# Load Whisper model once – reuse across calls.
+# Load Whisper model once – reuse across calls (use fast 'tiny' on CPU to avoid timeouts/OOM on 1GB containers).
 _DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-_MODEL = WhisperModel("base", device=_DEVICE, compute_type="float16" if _DEVICE == "cuda" else "int8")
+_WHISPER_SIZE = os.environ.get("WHISPER_MODEL", "base" if _DEVICE == "cuda" else "tiny")
+_MODEL = WhisperModel(_WHISPER_SIZE, device=_DEVICE, compute_type="float16" if _DEVICE == "cuda" else "int8")
 
 EXPORTS_DIR = Path(__file__).parent / "assets" / "exports"
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -72,7 +73,7 @@ def transcribe_audio_window(audio_path: str, clip_duration: float, start_time: f
     """
     slice_path = _slice_audio(audio_path, start_time, clip_duration)
     # Faster‑Whisper inference
-    segments, _ = _MODEL.transcribe(str(slice_path), word_timestamps=True, vad_filter=True)
+    segments, _ = _MODEL.transcribe(str(slice_path), word_timestamps=True, vad_filter=True, beam_size=1)
     # Concatenate words in order
     words = []
     for seg in segments:
@@ -88,7 +89,7 @@ def transcribe_audio_window(audio_path: str, clip_duration: float, start_time: f
 def transcribe_segments(audio_path: str, clip_duration: float, start_time: float = 0.0) -> List[Dict]:
     """Return timestamped lyric segments ``[{"text", "start", "end"}]`` for the audio slice."""
     slice_path = _slice_audio(audio_path, start_time, clip_duration)
-    segments, _ = _MODEL.transcribe(str(slice_path), word_timestamps=True, vad_filter=True)
+    segments, _ = _MODEL.transcribe(str(slice_path), word_timestamps=True, vad_filter=True, beam_size=1)
     aligned: List[Dict] = []
     for seg in segments:
         txt = (seg.text or "").strip()
