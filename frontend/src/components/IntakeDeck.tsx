@@ -563,10 +563,28 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
           <button
             onClick={generateVideo}
             disabled={videoLoading}
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-[#D4AF37] hover:bg-[#F5E084] text-[#070908] text-xs font-medium uppercase transition-all disabled:opacity-50"
+            className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-[#D4AF37] hover:bg-[#F5E084] text-[#070908] text-xs font-medium uppercase transition-all disabled:opacity-50 cursor-pointer"
           >
             {videoLoading ? 'Generating...' : 'Generate Video'}
           </button>
+          {onLaunchStudio && (
+            <button
+              type="button"
+              onClick={() =>
+                onLaunchStudio(
+                  projectState || {
+                    status: "completed",
+                    video: videoUrl || "/master_video.mp4",
+                    alignment: [],
+                  }
+                )
+              }
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#141b16] hover:bg-[#1c261f] border border-[#D4AF37]/60 text-[#F5E084] text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              <Layers className="w-4 h-4 text-[#D4AF37]" />
+              <span>OpenCut Studio</span>
+            </button>
+          )}
         </div>
         {/* Video preview after generation */}
         {videoUrl && (
