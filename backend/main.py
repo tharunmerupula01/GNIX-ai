@@ -136,6 +136,7 @@ async def amma_first_love(
     from .prompt_parser import parse_prompt
     parsed = parse_prompt(user_prompt)
     blueprint.update(parsed)
+    blueprint.setdefault("prompt", user_prompt)
     # Preferred language overrides the prompt parsing if supplied
     if preferred_lang:
         blueprint["preferred_lang"] = preferred_lang.lower()

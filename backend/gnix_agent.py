@@ -134,17 +134,35 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
     public_video = Path(__file__).parents[1] / "frontend" / "public" / "master_video.mp4"
     source_audio = audio_path if audio_path and audio_path.is_file() else Path(__file__).parents[1] / "assets" / "audio" / "uploaded_media_1794718451418.mp3"
 
-    # Generate real MP4 with FFmpeg (including dual‑language subtitles)
+    # Generate real MP4 with FFmpeg (background, audio-reactive waveform, and text/subtitles)
     try:
-        import subprocess, imageio_ffmpeg, shutil
+        import subprocess, imageio_ffmpeg, shutil, re
         ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-        # Determine language mode (dual or single)
-        preferred = blueprint.get('preferred_lang', 'dual').lower()
-        # Helper to escape single quotes for ffmpeg
-        def esc(txt):
-            return txt.replace("'", "\\'")
-        # Build drawtext filters
+
+        settings = blueprint.get("settings") or {}
+        bg_cfg = settings.get("background") or {}
+        font_cfg = settings.get("font") or {}
+        lyrics_cfg = settings.get("lyricsStyle") or {}
+        meta_cfg = blueprint.get("metadata") or {}
+
+        # Extract a valid hex color for FFmpeg background & waveform
+        def _extract_hex(val: str, default: str) -> str:
+            m = re.search(r"#([0-9a-fA-F]{6})", str(val or ""))
+            return f"0x{m.group(1)}" if m else default
+
+        bg_color = _extract_hex(bg_cfg.get("value", ""), "0x0f0c29")
+        wave_color = _extract_hex(font_cfg.get("color", ""), "0x00ff99")
+        font_size = max(20, min(96, int(font_cfg.get("size") or 48)))
+        lyrics_pos = lyrics_cfg.get("position", "center")
+        y_expr = "h*0.18" if lyrics_pos == "top" else ("h*0.70" if lyrics_pos == "bottom" else "(h-text_h)/2-60")
+
+        # Helper to escape drawtext characters for ffmpeg
+        def esc(txt: str) -> str:
+            return str(txt).replace("\\", "\\\\").replace("'", "\\'").replace(":", "\\:")
+
+        # Build drawtext filters for lyrics or fallback title/prompt banner
         filters = []
+        preferred = blueprint.get('preferred_lang', 'dual').lower()
         if preferred == 'dual' and 'telugu' in lyrics_multilang and 'english' in lyrics_multilang:
             for tel, eng in zip(lyrics_multilang['telugu'], lyrics_multilang['english']):
                 filters.append(
@@ -153,25 +171,56 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
                 filters.append(
                     f"drawtext=text='{esc(eng['text'])}':fontcolor=yellow:fontsize=32:x=(w-text_w)/2:y=h/2:enable='between(t,{eng['start']},{eng['end']})'"
                 )
-        else:
-            lang_key = preferred if preferred in lyrics_multilang else 'telugu'
+        elif lyrics_multilang:
+            lang_key = preferred if preferred in lyrics_multilang else next(iter(lyrics_multilang))
             for lyric in lyrics_multilang.get(lang_key, []):
                 filters.append(
-                    f"drawtext=text='{esc(lyric['text'])}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=h/3:enable='between(t,{lyric['start']},{lyric['end']})'"
+                    f"drawtext=text='{esc(lyric['text'])}':fontcolor={wave_color}:fontsize={font_size}:x=(w-text_w)/2:y={y_expr}:enable='between(t,{lyric['start']},{lyric['end']})'"
                 )
-        vf_filter = ','.join(filters) if filters else None
+        else:
+            banner = (meta_cfg.get("title") or "").strip() or (blueprint.get("prompt") or "GNIX AI").strip()[:60]
+            filters.append(
+                f"drawtext=text='{esc(banner)}':fontcolor={wave_color}:fontsize={font_size}:x=(w-text_w)/2:y={y_expr}"
+            )
+
+        text_chain = ("," + ",".join(filters)) if filters else ""
+        filter_complex = (
+            f"[0:v]format=yuv420p[bg];"
+            f"[1:a]showwaves=s=1280x200:mode=cline:colors={wave_color}[waves];"
+            f"[bg][waves]overlay=0:H-240{text_chain}[v]"
+        )
         cmd = [
             ffmpeg, "-y",
-            "-f", "lavfi", "-i", "color=c=0x070908:s=1280x720:d=30",
+            "-f", "lavfi", "-i", f"color=c={bg_color}:s=1280x720:d=30",
             "-i", str(source_audio),
+            "-filter_complex", filter_complex,
+            "-map", "[v]", "-map", "1:a",
             "-shortest",
             "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-c:a", "aac",
-            "-map", "0:v", "-map", "1:a",
-            *( ["-vf", vf_filter] if vf_filter else [] ),
             str(public_video)
         ]
-        subprocess.run(cmd, check=True)
+        try:
+            subprocess.run(cmd, check=True)
+        except Exception as draw_err:
+            # Fallback without drawtext in case libfreetype is unavailable
+            print("FFmpeg drawtext fallback:", draw_err)
+            fallback_complex = (
+                f"[0:v]format=yuv420p[bg];"
+                f"[1:a]showwaves=s=1280x200:mode=cline:colors={wave_color}[waves];"
+                f"[bg][waves]overlay=0:H-240[v]"
+            )
+            subprocess.run([
+                ffmpeg, "-y",
+                "-f", "lavfi", "-i", f"color=c={bg_color}:s=1280x720:d=30",
+                "-i", str(source_audio),
+                "-filter_complex", fallback_complex,
+                "-map", "[v]", "-map", "1:a",
+                "-shortest",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                str(public_video)
+            ], check=True)
         shutil.copyfile(str(public_video), str(video_path))
     except Exception as e:
         print("FFmpeg video rendering with subtitles:", e)

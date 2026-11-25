@@ -242,16 +242,20 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
       const resolvedVideoUrl = data.video_url || (data.video_path ? `/api/exports/${data.video_path}` : null);
       if (resolvedVideoUrl) {
         setVideoUrl(resolvedVideoUrl);
-        // Populate project state for OpenCut Studio
-        setProjectState({
+        const newState: ProjectState = {
           audio_slice: file.name,
           video: resolvedVideoUrl,
           transcription: data.transcription || "Video generated successfully.",
           alignment: data.alignment || [],
           status: data.status || "completed",
-        });
+        };
+        // Populate project state and transition straight into OpenCut Studio
+        setProjectState(newState);
         if (onSessionCreated && !activeSessionId) {
           onSessionCreated(sessionId);
+        }
+        if (onLaunchStudio) {
+          onLaunchStudio(newState);
         }
       } else {
         alert("Video not returned from server");
@@ -307,11 +311,6 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
               Master Audio & Media Ingestion
             </h3>
           </div>
-          {videoUrl && (
-            <div className="mt-4">
-              <video src={videoUrl} controls className="max-w-full rounded" />
-            </div>
-          )}
           <span className="text-[11px] font-mono text-[#8E9992] bg-[#121714] px-2.5 py-1 rounded border border-[#1e2621]">
             48kHz / 24-bit Lossless
           </span>
@@ -531,12 +530,6 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
             </div>
           </div>
         )}
-        {/* Single Video Preview (below workbench) */}
-        {videoUrl && (
-          <div className="mt-4">
-            <video src={videoUrl} controls className="max-w-full rounded" />
-          </div>
-        )}
       </section>
 
       {/* ============================================================== */}
@@ -691,33 +684,6 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
             </button>
           )}
         </div>
-        {/* Video preview after generation */}
-        {videoUrl && (
-          <div className="mt-4 space-y-3">
-            <video src={videoUrl} controls className="max-w-full rounded border border-[#1e2621]" />
-            {onLaunchStudio && (
-              <div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onLaunchStudio(
-                      projectState || {
-                        status: "completed",
-                        video: videoUrl,
-                        alignment: [],
-                      }
-                    )
-                  }
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#141b16] hover:bg-[#1c261f] border border-[#D4AF37]/60 text-[#F5E084] text-xs font-semibold tracking-wider uppercase transition-all cursor-pointer"
-                >
-                  <Layers className="w-4 h-4 text-[#D4AF37]" />
-                  <span>Open in OpenCut Studio</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </section>
     </div>
   );
