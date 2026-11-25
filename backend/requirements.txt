@@ -1,0 +1,11 @@
+fastapi==0.112.0
+uvicorn[standard]==0.30.0
+gunicorn==22.0.0
+python-multipart==0.0.9
+torch==2.3.0
+numpy==2.0.0
+librosa
+soundfile
+faster-whisper
+imageio-ffmpeg
+requests

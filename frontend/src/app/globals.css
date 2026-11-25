@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+:root {
+  --bg-deep: #070908;
+  --bg-surface: #0c0f0d;
+  --bg-card: #121714;
+  --bg-card-hover: #171e19;
+  --border-subtle: #1e2621;
+  --border-gold: rgba(212, 175, 55, 0.35);
+  --gold-primary: #D4AF37;
+  --gold-bright: #F5E084;
+  --gold-muted: #8E7831;
+  --text-main: #EAEFEC;
+  --text-muted: #8E9992;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  background-color: var(--bg-deep);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #090c0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2621;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-muted);
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pulseGold {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.5; }
+}
+
+.animate-shimmer {
+  animation: shimmer 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.gold-glow {
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.12);
+}
+
+.gold-glow-lg {
+  box-shadow: 0 0 45px rgba(212, 175, 55, 0.22);
+}
+
+.glass-panel {
+  background: rgba(14, 18, 16, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+}
+
+.glass-panel-subtle {
+  background: rgba(12, 15, 13, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
