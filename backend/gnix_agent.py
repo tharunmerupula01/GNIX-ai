@@ -132,12 +132,12 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
     export_dir.mkdir(parents=True, exist_ok=True)
     video_path = export_dir / f"video_{blueprint.get('session_id')}.mp4"
     public_video = Path(__file__).parents[1] / "frontend" / "public" / "master_video.mp4"
+    source_audio = audio_path if audio_path and audio_path.is_file() else Path(__file__).parents[1] / "assets" / "audio" / "uploaded_media_1794718451418.mp3"
 
     # Generate real MP4 with FFmpeg (including dual‑language subtitles)
     try:
         import subprocess, imageio_ffmpeg, shutil
         ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-        source_audio = audio_path if audio_path and audio_path.is_file() else Path(__file__).parents[1] / "assets" / "audio" / "uploaded_media_1794718451418.mp3"
         # Determine language mode (dual or single)
         preferred = blueprint.get('preferred_lang', 'dual').lower()
         # Helper to escape single quotes for ffmpeg
@@ -148,16 +148,16 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
         if preferred == 'dual' and 'telugu' in lyrics_multilang and 'english' in lyrics_multilang:
             for tel, eng in zip(lyrics_multilang['telugu'], lyrics_multilang['english']):
                 filters.append(
-                    f"drawtext=fontfile=/Windows/Fonts/arial.ttf:text='{esc(tel['text'])}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=h/3:enable='between(t,{tel['start']},{tel['end']})'"
+                    f"drawtext=text='{esc(tel['text'])}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=h/3:enable='between(t,{tel['start']},{tel['end']})'"
                 )
                 filters.append(
-                    f"drawtext=fontfile=/Windows/Fonts/arial.ttf:text='{esc(eng['text'])}':fontcolor=yellow:fontsize=32:x=(w-text_w)/2:y=h/2:enable='between(t,{eng['start']},{eng['end']})'"
+                    f"drawtext=text='{esc(eng['text'])}':fontcolor=yellow:fontsize=32:x=(w-text_w)/2:y=h/2:enable='between(t,{eng['start']},{eng['end']})'"
                 )
         else:
             lang_key = preferred if preferred in lyrics_multilang else 'telugu'
             for lyric in lyrics_multilang.get(lang_key, []):
                 filters.append(
-                    f"drawtext=fontfile=/Windows/Fonts/arial.ttf:text='{esc(lyric['text'])}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=h/3:enable='between(t,{lyric['start']},{lyric['end']})'"
+                    f"drawtext=text='{esc(lyric['text'])}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=h/3:enable='between(t,{lyric['start']},{lyric['end']})'"
                 )
         vf_filter = ','.join(filters) if filters else None
         cmd = [
@@ -167,7 +167,7 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
             "-shortest",
             "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-c:a", "aac",
-            "-map", "0:v", "-map", "0:a",
+            "-map", "0:v", "-map", "1:a",
             *( ["-vf", vf_filter] if vf_filter else [] ),
             str(public_video)
         ]
@@ -177,7 +177,7 @@ def _run_pipeline(blueprint: Dict[str, Any]) -> Dict[str, Any]:
         print("FFmpeg video rendering with subtitles:", e)
 
     return {
-        "audio_slice": str(wav_path) if wav_path else None,
+        "audio_slice": str(source_audio) if source_audio else None,
         "transcription": transcription,
         "alignment": alignment,
         "lyrics_multilang": lyrics_multilang,
