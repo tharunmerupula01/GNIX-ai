@@ -233,8 +233,10 @@ export const IntakeDeck: React.FC<IntakeDeckProps> = ({
       }
       if (!res.ok) throw new Error(`Server ${res.status}`);
       const data = await res.json();
-      if (data.video_path) {
-        setVideoUrl(`/static/${data.video_path}`);
+      if (data.video_url) {
+        setVideoUrl(data.video_url);
+      } else if (data.video_path) {
+        setVideoUrl(`/api/exports/${data.video_path}`);
       } else {
         alert('Video not returned from server');
       }

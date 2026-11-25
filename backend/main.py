@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .gnix_agent import GnixAgent
 
@@ -23,6 +24,11 @@ app = FastAPI()
 # Include OpenCut router
 from backend.opencut_api import router as opencut_router
 app.include_router(opencut_router)
+
+# Serve exported videos at /api/exports/*
+exports_dir = Path(__file__).parent / "assets" / "exports"
+exports_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/api/exports", StaticFiles(directory=str(exports_dir)), name="exports")
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,25 +97,27 @@ async def gnix_chat(
 # New custom endpoint for the "Amma is My First Love" modal
 @app.post("/api/amma-is-my-first-love")
 async def amma_first_love(
-    prompt: str = Form(...),
-    audio_file: UploadFile = File(...),
+    prompt: Optional[str] = Form(None),
+    message: Optional[str] = Form(None),
+    text: Optional[str] = Form(None),
+    audio_file: Optional[UploadFile] = File(None),
     session_id: Optional[str] = Form(None),
     preferred_lang: Optional[str] = Form(None),
 ):
     """Endpoint that accepts a song and a free‑form prompt, parses the prompt,
     runs the full pipeline and returns the generated video.
     """
-    # Save uploaded audio (reuse helper)
-    path = _load_file_temp(audio_file)
+    user_prompt = prompt or message or text or "Generate video"
     sess_id = session_id or str(uuid.uuid4())
-    # Prepare a fresh blueprint for this request
     blueprint = {
         "session_id": sess_id,
-        "audio_file": path.name,
     }
+    if audio_file:
+        path = _load_file_temp(audio_file)
+        blueprint["audio_file"] = path.name
     # Parse the free‑form prompt
     from .prompt_parser import parse_prompt
-    parsed = parse_prompt(prompt)
+    parsed = parse_prompt(user_prompt)
     blueprint.update(parsed)
     # Preferred language overrides the prompt parsing if supplied
     if preferred_lang:
@@ -119,9 +127,11 @@ async def amma_first_love(
     # Run the pipeline directly
     from .gnix_agent import _run_pipeline
     proj_state = _run_pipeline(blueprint)
+    video_name = Path(proj_state["video"]).name if proj_state.get("video") else None
     return JSONResponse(content={
         "session_id": sess_id,
-        "video_path": proj_state.get("video"),
+        "video_path": video_name,
+        "video_url": f"/api/exports/{video_name}" if video_name else None,
         "transcription": proj_state.get("transcription"),
         "alignment": proj_state.get("alignment"),
         "status": "completed",
