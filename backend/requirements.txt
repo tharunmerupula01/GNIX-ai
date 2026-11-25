@@ -1,7 +1,0 @@
-fastapi==0.112.0
-uvicorn[standard]==0.30.0
-gunicorn==22.0.0
-python-multipart==0.0.9
-torch==2.3.0
-numpy==2.0.0
-# ffmpeg is installed via apt in the Docker image; no Python wrapper needed unless you use ffmpeg‑python
