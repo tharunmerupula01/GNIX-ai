@@ -630,7 +630,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
               Rendered with FFmpeg & synchronized audio.
             </p>
             <a
-              href="/master_video.mp4"
+              href={projectState.video || "/master_video.mp4"}
               download="gnix_master_video.mp4"
               className="inline-flex items-center gap-2 px-3 py-2 rounded bg-[#D4AF37] text-black font-bold uppercase text-[11px] hover:bg-[#F5E084] transition-colors w-full justify-center shadow-[0_0_12px_rgba(212,175,55,0.3)]"
             >
